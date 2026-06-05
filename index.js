@@ -2,8 +2,19 @@ const { Client } = require('discord.js-selfbot-v13');
 const express = require('express');
 
 // --- CONFIGURATION ---
-const SOURCE_CHANNEL_ID = '1478369331376160928';
-const TARGET_CHANNEL_ID = '1512350167209082981';
+// Map your Source Channel IDs to your Target Channel IDs here.
+// Format: 'SOURCE_CHANNEL_ID': 'TARGET_CHANNEL_ID'
+const CHANNEL_MAP = {
+    '1397976773773492345': '1512370311071531162',
+    '1397976994209333278': '1512370360824107018',
+    '1397977231862665387': '1512370396320501861',
+    '1478369331376160928': '1512350167209082981', // Your TH14 IDs
+    '1397977306009571489': '1512370432190451843',
+    '1397977323227185284': '1512370468718641162',
+    '1397977380022386789': '1512370507893440602',
+    '1440934909043544185': '1512370543477784656'
+};
+
 const CLASHKING_BOT_ID = '824653933347209227';
 
 const processedMessages = new Set();
@@ -21,8 +32,13 @@ client.on('ready', () => console.log(`[Discord] Authenticated successfully as: $
 async function handleClashKingMessage(message) {
     // Prevent duplicate processing
     if (processedMessages.has(message.id)) return;
-    if (message.channelId !== SOURCE_CHANNEL_ID) return;
+    
+    // Check if the message is from ClashKing AND if it's in one of our tracked Source channels
     if (message.author.id !== CLASHKING_BOT_ID) return;
+    if (!CHANNEL_MAP[message.channelId]) return;
+
+    // Get the correct target channel for this specific source
+    const targetChannelId = CHANNEL_MAP[message.channelId];
 
     // Look for the "Link" button in the message components
     let linkButton = null;
@@ -39,7 +55,7 @@ async function handleClashKingMessage(message) {
     processedMessages.add(message.id);
     setTimeout(() => processedMessages.delete(message.id), 5 * 60 * 1000);
 
-    console.log(`[+] Found new base post (${message.id}). Extracting...`);
+    console.log(`[+] Found new base post in channel ${message.channelId}. Extracting...`);
 
     // 1. Get the Description
     let description = message.content || "";
@@ -78,7 +94,7 @@ async function handleClashKingMessage(message) {
 
         // Wait for the gateway to catch the link
         const realClashLink = await ephemeralPromise;
-        const targetChannel = await client.channels.fetch(TARGET_CHANNEL_ID);
+        const targetChannel = await client.channels.fetch(targetChannelId);
         if (!targetChannel) return;
 
         // 4. Construct and send the final message
@@ -94,7 +110,7 @@ async function handleClashKingMessage(message) {
         // Wrap the link in < > to suppress the automatic Clash of Clans embed preview
         let outputMessage = `**New Base Shared!**\n\n**Description:**\n${description}\n\n**Layout Link:**\n<${realClashLink}>`;
         
-        // Send to target channel
+        // Send to target channel mapped to this source
         if (imageUrl) {
             await targetChannel.send({ 
                 content: outputMessage, 
@@ -106,7 +122,7 @@ async function handleClashKingMessage(message) {
             });
         }
         
-        console.log(`[+] Forwarded base and link perfectly to target channel.`);
+        console.log(`[+] Forwarded cleanly to target channel: ${targetChannelId}`);
 
     } catch (err) {
         console.error(`[!] Failed processing message ${message.id}:`, err.message);

@@ -6,7 +6,7 @@ const { Client } = require("discord.js-selfbot-v13");
 const app = express();
 
 app.get("/", (req, res) => {
-    res.send("Bot Alive");
+    res.send("Alive");
 });
 
 app.listen(3000, () => {
@@ -20,7 +20,6 @@ const TOKEN = process.env.TOKEN;
 // SOURCE -> TARGET
 const CHANNELS = {
 
-    // TH14
     "1478369331376160928":
     "1512350167209082981"
 
@@ -34,7 +33,7 @@ function wait(ms) {
 
 }
 
-// PREVENT DUPLICATES
+// DUPLICATE PREVENTION
 const processed = new Set();
 
 client.on("ready", () => {
@@ -71,10 +70,10 @@ async (message) => {
 
         processed.add(message.id);
 
-        // WAIT FOR FULL MESSAGE
+        // WAIT FOR EMBEDS
         await wait(12000);
 
-        // REFETCH
+        // REFETCH FULL MESSAGE
         message =
         await message.channel.messages.fetch(
             message.id
@@ -86,14 +85,12 @@ async (message) => {
             targetChannelId
         );
 
-        // DESCRIPTION
         let description =
             message.content || "";
 
-        // IMAGE
         let imageUrl = null;
 
-        // ATTACHMENTS
+        // IMAGE FROM ATTACHMENTS
         if (
             message.attachments.size > 0
         ) {
@@ -105,33 +102,67 @@ async (message) => {
 
         }
 
-        // REAL BASE LINK
+        // IMAGE FROM EMBED
+        if (
+            !imageUrl &&
+            message.embeds.length > 0
+        ) {
+
+            const embed =
+            message.embeds[0];
+
+            if (
+                embed.image?.url
+            ) {
+
+                imageUrl =
+                embed.image.url;
+
+            }
+
+        }
+
+        // ===== FIND REAL LINK =====
+
         let baseLink = null;
 
-        // SEARCH EVERYWHERE
         const raw =
-            JSON.stringify(message);
+        JSON.stringify(
+            message,
+            null,
+            2
+        );
 
-        const match =
+        console.log(raw);
+
+        const matches =
         raw.match(
-        /https:\/\/link\.clashofclans\.com\/en\?action=OpenLayout[^"\\ ]+/i
+/https:\/\/link\.clashofclans\.com\/en\?action=OpenLayout&id=[A-Za-z0-9%:_\-]+/g
         );
 
         if (
-            match &&
-            match[0]
+            matches &&
+            matches.length > 0
         ) {
 
-            baseLink = match[0]
-                .replace(/\\u0026/g, "&")
-                .replace(/\\/g, "");
+            baseLink =
+            matches[0]
+                .replace(
+                    /\\u0026/g,
+                    "&"
+                )
+                .replace(
+                    /\\/g,
+                    ""
+                );
 
         }
 
         console.log(
-            "FOUND LINK:",
-            baseLink
+            "FOUND BASE LINK:"
         );
+
+        console.log(baseLink);
 
         // DOWNLOAD IMAGE
         let tempFile = null;
@@ -195,7 +226,7 @@ async (message) => {
         // WAIT
         await wait(1500);
 
-        // SEND LINK SEPARATELY
+        // SEND LINK
         if (baseLink) {
 
             await target.send(
@@ -205,14 +236,17 @@ async (message) => {
         }
 
         console.log(
-            "Successfully copied base"
+            "Forwarded Successfully"
         );
 
     }
 
     catch (err) {
 
-        console.log("ERROR:");
+        console.log(
+            "ERROR:"
+        );
+
         console.log(err);
 
     }

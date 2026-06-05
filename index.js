@@ -16,7 +16,7 @@ const client = new Client();
 
 const TOKEN = process.env.TOKEN;
 
-// SOURCE : DESTINATION
+// SOURCE CHANNEL : DEST CHANNEL
 const CHANNELS = {
 
     // TH11
@@ -73,7 +73,7 @@ async (msg) => {
             "824653933347209227"
         ) return;
 
-        // TARGET CHANNEL
+        // FIND TARGET
         const targetChannelId =
             CHANNELS[msg.channel.id];
 
@@ -89,7 +89,7 @@ async (msg) => {
         if (!targetChannel)
             return;
 
-        // WAIT 5 SECONDS
+        // WAIT 5 SEC
         await new Promise(resolve =>
             setTimeout(resolve, 5000)
         );
@@ -100,14 +100,14 @@ async (msg) => {
             msg.id
         );
 
-        // TEXT
+        // MESSAGE TEXT
         let content =
             msg.content || "";
 
         // BASE LINK
         let baseLink = null;
 
-        // FROM BUTTONS
+        // BUTTON URL
         if (msg.components?.length) {
 
             for (
@@ -133,10 +133,10 @@ async (msg) => {
 
         }
 
-        // FROM EMBEDS
+        // EMBED URL
         if (
             !baseLink &&
-            msg.embeds.length > 0
+            msg.embeds?.length
         ) {
 
             for (
@@ -144,7 +144,7 @@ async (msg) => {
                 of msg.embeds
             ) {
 
-                // EMBED URL
+                // DIRECT EMBED URL
                 if (embed.url) {
 
                     baseLink =
@@ -163,13 +163,53 @@ async (msg) => {
                         /(https?:\/\/[^\s]+)/g
                     );
 
-                    if (found)
+                    if (found) {
+
                         baseLink =
                             found[0];
+
+                    }
+
+                }
+
+                // FIELD URL
+                if (
+                    !baseLink &&
+                    embed.fields?.length
+                ) {
+
+                    for (
+                        const field
+                        of embed.fields
+                    ) {
+
+                        const found =
+                        field.value?.match(
+                            /(https?:\/\/[^\s]+)/g
+                        );
+
+                        if (found) {
+
+                            baseLink =
+                                found[0];
+
+                            break;
+
+                        }
+
+                    }
 
                 }
 
             }
+
+        }
+
+        // FALLBACK
+        if (!baseLink) {
+
+            baseLink =
+            "https://link.clashofclans.com";
 
         }
 
@@ -186,19 +226,13 @@ async (msg) => {
         let finalMessage =
             content;
 
-        if (baseLink) {
-
-            finalMessage +=
+        finalMessage +=
 `\n\n🔗 Base Link:\n${baseLink}`;
-
-        }
 
         // SEND
         await targetChannel.send({
 
-            content:
-                finalMessage || null,
-
+            content: finalMessage,
             files: files
 
         });

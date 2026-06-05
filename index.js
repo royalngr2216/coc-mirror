@@ -51,47 +51,102 @@ client.on("ready", () => {
 
 client.on("messageCreate", async (msg) => {
 
-    // Check if message channel is in mapping
     const webhook = WEBHOOKS[msg.channel.id];
 
     if (!webhook) return;
 
     try {
 
-        const form = new FormData();
+        let content = msg.content || "";
 
-        // Message text
-        form.append("content", msg.content || " ");
+        // Extract embed content
+        if (msg.embeds.length > 0) {
 
-        // Attachments/images
-        if (msg.attachments.size > 0) {
+            for (const embed of msg.embeds) {
 
-            const attachment = msg.attachments.first();
-
-            const response = await axios.get(
-                attachment.url,
-                {
-                    responseType: "arraybuffer"
+                if (embed.title) {
+                    content += `\n${embed.title}`;
                 }
-            );
 
-            form.append(
-                "file",
-                response.data,
-                attachment.name
-            );
+                if (embed.description) {
+                    content += `\n${embed.description}`;
+                }
+
+                if (embed.url) {
+                    content += `\n${embed.url}`;
+                }
+
+                if (embed.fields?.length > 0) {
+
+                    for (const field of embed.fields) {
+
+                        content += `\n${field.name}: ${field.value}`;
+
+                    }
+
+                }
+
+            }
+
         }
 
-        // Send to your webhook
+        // Extract button links
+        if (msg.components.length > 0) {
+
+            for (const row of msg.components) {
+
+                for (const component of row.components) {
+
+                    if (component.url) {
+
+                        content += `\n${component.label}: ${component.url}`;
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        const form = new FormData();
+
+        form.append("content", content || " ");
+
+        // Multiple attachment support
+        if (msg.attachments.size > 0) {
+
+            let index = 0;
+
+            for (const attachment of msg.attachments.values()) {
+
+                const response = await axios.get(
+                    attachment.url,
+                    {
+                        responseType: "arraybuffer"
+                    }
+                );
+
+                form.append(
+                    `file${index}`,
+                    response.data,
+                    attachment.name
+                );
+
+                index++;
+            }
+
+        }
+
         await axios.post(webhook, form, {
             headers: form.getHeaders()
         });
 
-        console.log(`Copied message from ${msg.channel.name}`);
+        console.log(`Copied from ${msg.channel.name}`);
 
     } catch (err) {
 
-        console.log("Error:");
+        console.log("ERROR:");
         console.log(err);
 
     }

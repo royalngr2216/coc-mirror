@@ -54,9 +54,15 @@ client.on("messageCreate", async (msg) => {
 
     try {
 
-        // ONLY CLASHKING BOT
+        // ONLY CLASHKING
         if (msg.author.id !== "824653933347209227")
             return;
+
+        // MUST HAVE EMBED / IMAGE
+        if (
+            msg.embeds.length === 0 &&
+            msg.attachments.size === 0
+        ) return;
 
         // FIND TARGET CHANNEL
         const targetChannelId =
@@ -77,7 +83,7 @@ client.on("messageCreate", async (msg) => {
         await msg.forward(targetChannel);
 
         console.log(
-            `Forwarded from ${msg.channel.name}`
+            `Forwarded ClashKing base from ${msg.channel.name}`
         );
 
     } catch (err) {

@@ -17,7 +17,7 @@ const client = new Client();
 
 const TOKEN = process.env.TOKEN;
 
-// SOURCE CHANNEL : DEST CHANNEL
+// SOURCE CHANNEL : DESTINATION CHANNEL
 const CHANNELS = {
 
     // TH14
@@ -76,11 +76,7 @@ async (msg) => {
             msg.id
         );
 
-        // DESCRIPTION
-        let description =
-            msg.content || "";
-
-        // FILES / IMAGES
+        // IMAGE FILES
         let files = [];
 
         msg.attachments.forEach(a => {
@@ -89,51 +85,64 @@ async (msg) => {
 
         });
 
-        // GET REAL BASE LINK
-        let realLink = null;
+        // SEND IMAGE ONLY
+        if (files.length > 0) {
 
-        const raw =
-            JSON.stringify(msg);
+            await targetChannel.send({
+
+                files: files
+
+            });
+
+        }
+
+        // EXTRA WAIT
+        await new Promise(resolve =>
+            setTimeout(resolve, 1000)
+        );
+
+        // GET REAL LINK
+        let raw = "";
+
+        raw += JSON.stringify(msg);
+        raw += JSON.stringify(msg.embeds);
+        raw += JSON.stringify(msg.components);
+        raw += JSON.stringify(msg.interaction);
 
         const match =
-            raw.match(
-                /https:\/\/link\.clashofclans\.com[^\s"]+/g
-            );
+        raw.match(
+        /https:\/\/link\.clashofclans\.com\/en\?action=OpenLayout[^\s"]+/g
+        );
+
+        let realLink = null;
 
         if (
             match &&
             match[0]
         ) {
 
-            realLink =
-                match[0];
+            realLink = match[0];
 
         }
 
-        // SEND IMAGE + TEXT
-        await targetChannel.send({
-
-            content: description,
-            files: files
-
-        });
-
-        // SEND REAL LINK AFTER 1 SECOND
+        // SEND REAL LINK
         if (realLink) {
-
-            await new Promise(resolve =>
-                setTimeout(resolve, 1000)
-            );
 
             await targetChannel.send(
                 realLink
             );
 
-        }
+            console.log(
+                "Real base link sent"
+            );
 
-        console.log(
-            `Successfully copied ClashKing base`
-        );
+        } else {
+
+            console.log(
+                "No real link found"
+            );
+
+        }
 
     } catch (err) {
 

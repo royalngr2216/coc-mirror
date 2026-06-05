@@ -9,27 +9,16 @@ app.listen(3000, () => {
     console.log("Web server running");
 });
 
-const { Client } =
-require("discord.js-selfbot-v13");
+const {
+    Client
+} = require("discord.js-selfbot-v13");
 
 const client = new Client();
 
 const TOKEN = process.env.TOKEN;
 
-// SOURCE CHANNEL : DEST CHANNEL
+// SOURCE : DEST
 const CHANNELS = {
-
-    // TH11
-    "SOURCE_TH11_ID":
-    "DEST_TH11_ID",
-
-    // TH12
-    "SOURCE_TH12_ID":
-    "DEST_TH12_ID",
-
-    // TH13
-    "SOURCE_TH13_ID":
-    "DEST_TH13_ID",
 
     // TH14
     "1478369331376160928":
@@ -37,19 +26,7 @@ const CHANNELS = {
 
     // TH15
     "1478369429380137222":
-    "1512350167209082981",
-
-    // TH16
-    "SOURCE_TH16_ID":
-    "DEST_TH16_ID",
-
-    // TH17
-    "SOURCE_TH17_ID":
-    "DEST_TH17_ID",
-
-    // TH18
-    "SOURCE_TH18_ID":
-    "DEST_TH18_ID"
+    "1512350167209082981"
 
 };
 
@@ -73,14 +50,13 @@ async (msg) => {
             "824653933347209227"
         ) return;
 
-        // FIND TARGET
+        // FIND DEST
         const targetChannelId =
             CHANNELS[msg.channel.id];
 
         if (!targetChannelId)
             return;
 
-        // FETCH TARGET
         const targetChannel =
             await client.channels.fetch(
                 targetChannelId
@@ -89,25 +65,34 @@ async (msg) => {
         if (!targetChannel)
             return;
 
-        // WAIT 5 SEC
+        // WAIT
         await new Promise(resolve =>
             setTimeout(resolve, 5000)
         );
 
-        // REFETCH MESSAGE
+        // REFETCH
         msg =
         await msg.channel.messages.fetch(
             msg.id
         );
 
-        // MESSAGE TEXT
+        // TEXT
         let content =
             msg.content || "";
 
-        // BASE LINK
-        let baseLink = null;
+        // IMAGE FILES
+        let files = [];
 
-        // BUTTON URL
+        msg.attachments.forEach(a => {
+
+            files.push(a.url);
+
+        });
+
+        // REAL BASE LINK
+        let realLink = null;
+
+        // TRY BUTTONS
         if (msg.components?.length) {
 
             for (
@@ -120,9 +105,14 @@ async (msg) => {
                     of row.components
                 ) {
 
-                    if (component.url) {
+                    if (
+                        component.url &&
+                        component.url.includes(
+                            "OpenLayout"
+                        )
+                    ) {
 
-                        baseLink =
+                        realLink =
                             component.url;
 
                     }
@@ -133,9 +123,41 @@ async (msg) => {
 
         }
 
-        // EMBED URL
+        // TRY INTERACTION METADATA
         if (
-            !baseLink &&
+            !realLink &&
+            msg.interaction
+        ) {
+
+            try {
+
+                const raw =
+                JSON.stringify(
+                    msg.interaction
+                );
+
+                const match =
+                raw.match(
+                    /https:\/\/link\.clashofclans\.com[^\s"]+/g
+                );
+
+                if (
+                    match &&
+                    match[0]
+                ) {
+
+                    realLink =
+                        match[0];
+
+                }
+
+            } catch {}
+
+        }
+
+        // TRY EMBEDS
+        if (
+            !realLink &&
             msg.embeds?.length
         ) {
 
@@ -144,60 +166,23 @@ async (msg) => {
                 of msg.embeds
             ) {
 
-                // DIRECT EMBED URL
-                if (embed.url) {
+                const raw =
+                JSON.stringify(embed);
 
-                    baseLink =
-                        embed.url;
+                const match =
+                raw.match(
+                    /https:\/\/link\.clashofclans\.com[^\s"]+/g
+                );
 
-                }
-
-                // DESCRIPTION URL
                 if (
-                    !baseLink &&
-                    embed.description
+                    match &&
+                    match[0]
                 ) {
 
-                    const found =
-                    embed.description.match(
-                        /(https?:\/\/[^\s]+)/g
-                    );
+                    realLink =
+                        match[0];
 
-                    if (found) {
-
-                        baseLink =
-                            found[0];
-
-                    }
-
-                }
-
-                // FIELD URL
-                if (
-                    !baseLink &&
-                    embed.fields?.length
-                ) {
-
-                    for (
-                        const field
-                        of embed.fields
-                    ) {
-
-                        const found =
-                        field.value?.match(
-                            /(https?:\/\/[^\s]+)/g
-                        );
-
-                        if (found) {
-
-                            baseLink =
-                                found[0];
-
-                            break;
-
-                        }
-
-                    }
+                    break;
 
                 }
 
@@ -205,40 +190,27 @@ async (msg) => {
 
         }
 
-        // FALLBACK
-        if (!baseLink) {
-
-            baseLink =
-            "https://link.clashofclans.com";
-
-        }
-
-        // FILES
-        let files = [];
-
-        msg.attachments.forEach(a => {
-
-            files.push(a.url);
-
-        });
-
         // FINAL MESSAGE
-        let finalMessage =
+        let finalText =
             content;
 
-        finalMessage +=
-`\n\n🔗 Base Link:\n${baseLink}`;
+        if (realLink) {
+
+            finalText +=
+`\n\n🔗 Base Link:\n${realLink}`;
+
+        }
 
         // SEND
         await targetChannel.send({
 
-            content: finalMessage,
+            content: finalText,
             files: files
 
         });
 
         console.log(
-            `Copied base from ${msg.channel.name}`
+            `Copied real ClashKing base`
         );
 
     } catch (err) {

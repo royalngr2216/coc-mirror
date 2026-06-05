@@ -17,7 +17,7 @@ const client = new Client();
 
 const TOKEN = process.env.TOKEN;
 
-// SOURCE : DEST
+// SOURCE CHANNEL : DEST CHANNEL
 const CHANNELS = {
 
     // TH14
@@ -50,7 +50,7 @@ async (msg) => {
             "824653933347209227"
         ) return;
 
-        // FIND DEST
+        // FIND TARGET CHANNEL
         const targetChannelId =
             CHANNELS[msg.channel.id];
 
@@ -65,22 +65,22 @@ async (msg) => {
         if (!targetChannel)
             return;
 
-        // WAIT
+        // WAIT FOR MESSAGE TO FULLY LOAD
         await new Promise(resolve =>
             setTimeout(resolve, 5000)
         );
 
-        // REFETCH
+        // REFETCH MESSAGE
         msg =
         await msg.channel.messages.fetch(
             msg.id
         );
 
-        // TEXT
-        let content =
+        // DESCRIPTION
+        let description =
             msg.content || "";
 
-        // IMAGE FILES
+        // FILES / IMAGES
         let files = [];
 
         msg.attachments.forEach(a => {
@@ -89,128 +89,50 @@ async (msg) => {
 
         });
 
-        // REAL BASE LINK
+        // GET REAL BASE LINK
         let realLink = null;
 
-        // TRY BUTTONS
-        if (msg.components?.length) {
+        const raw =
+            JSON.stringify(msg);
 
-            for (
-                const row
-                of msg.components
-            ) {
+        const match =
+            raw.match(
+                /https:\/\/link\.clashofclans\.com[^\s"]+/g
+            );
 
-                for (
-                    const component
-                    of row.components
-                ) {
-
-                    if (
-                        component.url &&
-                        component.url.includes(
-                            "OpenLayout"
-                        )
-                    ) {
-
-                        realLink =
-                            component.url;
-
-                    }
-
-                }
-
-            }
-
-        }
-
-        // TRY INTERACTION METADATA
         if (
-            !realLink &&
-            msg.interaction
+            match &&
+            match[0]
         ) {
 
-            try {
-
-                const raw =
-                JSON.stringify(
-                    msg.interaction
-                );
-
-                const match =
-                raw.match(
-                    /https:\/\/link\.clashofclans\.com[^\s"]+/g
-                );
-
-                if (
-                    match &&
-                    match[0]
-                ) {
-
-                    realLink =
-                        match[0];
-
-                }
-
-            } catch {}
+            realLink =
+                match[0];
 
         }
 
-        // TRY EMBEDS
-        if (
-            !realLink &&
-            msg.embeds?.length
-        ) {
-
-            for (
-                const embed
-                of msg.embeds
-            ) {
-
-                const raw =
-                JSON.stringify(embed);
-
-                const match =
-                raw.match(
-                    /https:\/\/link\.clashofclans\.com[^\s"]+/g
-                );
-
-                if (
-                    match &&
-                    match[0]
-                ) {
-
-                    realLink =
-                        match[0];
-
-                    break;
-
-                }
-
-            }
-
-        }
-
-        // FINAL MESSAGE
-        let finalText =
-            content;
-
-        if (realLink) {
-
-            finalText +=
-`\n\n🔗 Base Link:\n${realLink}`;
-
-        }
-
-        // SEND
+        // SEND IMAGE + TEXT
         await targetChannel.send({
 
-            content: finalText,
+            content: description,
             files: files
 
         });
 
+        // SEND REAL LINK AFTER 1 SECOND
+        if (realLink) {
+
+            await new Promise(resolve =>
+                setTimeout(resolve, 1000)
+            );
+
+            await targetChannel.send(
+                realLink
+            );
+
+        }
+
         console.log(
-            `Copied real ClashKing base`
+            `Successfully copied ClashKing base`
         );
 
     } catch (err) {

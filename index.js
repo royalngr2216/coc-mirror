@@ -51,6 +51,9 @@ client.on("ready", () => {
 
 client.on("messageCreate", async (msg) => {
 
+    // Only copy ClashKing bot messages
+    if (msg.author.id !== "824653933347209227") return;
+
     const webhook = WEBHOOKS[msg.channel.id];
 
     if (!webhook) return;
@@ -59,7 +62,7 @@ client.on("messageCreate", async (msg) => {
 
         let content = msg.content || "";
 
-        // Extract embed content
+        // Extract embeds
         if (msg.embeds.length > 0) {
 
             for (const embed of msg.embeds) {
@@ -86,11 +89,18 @@ client.on("messageCreate", async (msg) => {
 
                 }
 
+                // image inside embed
+                if (embed.image?.url) {
+
+                    content += `\n${embed.image.url}`;
+
+                }
+
             }
 
         }
 
-        // Extract button links
+        // Extract buttons/links
         if (msg.components.length > 0) {
 
             for (const row of msg.components) {
@@ -113,7 +123,7 @@ client.on("messageCreate", async (msg) => {
 
         form.append("content", content || " ");
 
-        // Multiple attachment support
+        // Multiple attachments
         if (msg.attachments.size > 0) {
 
             let index = 0;
@@ -142,7 +152,7 @@ client.on("messageCreate", async (msg) => {
             headers: form.getHeaders()
         });
 
-        console.log(`Copied from ${msg.channel.name}`);
+        console.log(`Copied ClashKing post from ${msg.channel.name}`);
 
     } catch (err) {
 

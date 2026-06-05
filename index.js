@@ -62,7 +62,7 @@ client.on("messageCreate", async (msg) => {
 
         let content = msg.content || "";
 
-        // Extract embeds
+        // Extract embed data
         if (msg.embeds.length > 0) {
 
             for (const embed of msg.embeds) {
@@ -89,7 +89,6 @@ client.on("messageCreate", async (msg) => {
 
                 }
 
-                // image inside embed
                 if (embed.image?.url) {
 
                     content += `\n${embed.image.url}`;
@@ -100,7 +99,7 @@ client.on("messageCreate", async (msg) => {
 
         }
 
-        // Extract buttons/links
+        // Extract button links
         if (msg.components.length > 0) {
 
             for (const row of msg.components) {
@@ -121,9 +120,14 @@ client.on("messageCreate", async (msg) => {
 
         const form = new FormData();
 
-        form.append("content", content || " ");
+        // Prevent empty webhook error
+        if (!content.trim()) {
+            content = "Base Link Below";
+        }
 
-        // Multiple attachments
+        form.append("content", content);
+
+        // Copy attachments/images
         if (msg.attachments.size > 0) {
 
             let index = 0;
@@ -144,6 +148,7 @@ client.on("messageCreate", async (msg) => {
                 );
 
                 index++;
+
             }
 
         }

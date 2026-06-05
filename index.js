@@ -1,9 +1,8 @@
-const { Client } = require('discord.js-selfbot-v13');
+ const { Client } = require('discord.js-selfbot-v13');
 const express = require('express');
 
 // --- CONFIGURATION ---
-// ⚠️ REPLACE THIS with your main Discord account ID (Right-click your profile -> Copy User ID)
-const ADMIN_ID = '1287545546231255092'; 
+const ADMIN_ID = '1287545546231255092'; // Your verified main account ID
 
 const CHANNEL_MAP = {
     '1397976773773492345': '1512370311071531162', // TH11
@@ -34,8 +33,6 @@ async function handleClashKingMessage(message, isManual = false) {
     if (message.author.id !== CLASHKING_BOT_ID) return false;
     if (!CHANNEL_MAP[message.channelId]) return false;
 
-    // Ignore the message entirely if it was originally posted more than 2 minutes ago
-    // Unless you manually requested it via DM
     if (!isManual) {
         const messageAge = Date.now() - message.createdTimestamp;
         if (messageAge > 120000) return false; 
@@ -56,7 +53,7 @@ async function handleClashKingMessage(message, isManual = false) {
 
     console.log(`[+] Processing base layout (${message.id})...`);
 
-    let description = message.content || "";
+    let description = message.content || "No description provided.";
     let imageUrl = null;
     if (message.attachments.size > 0) {
         imageUrl = message.attachments.first().url;
@@ -84,18 +81,7 @@ async function handleClashKingMessage(message, isManual = false) {
         const realClashLink = await ephemeralPromise;
         
         if (realClashLink) {
-            const targetChannelId = CHANNEL_MAP[message.channelId];
-            const targetChannel = await client.channels.fetch(targetChannelId);
-            if (!targetChannel) return false;
-
-            let outputMessage = `**New Base Shared!**\n\n**Description:**\n${description}\n\n**Layout Link:**\n<${realClashLink}>`;
-            
-            if (imageUrl) {
-                await targetChannel.send({ content: outputMessage, files: [imageUrl] });
-            } else {
-                await targetChannel.send({ content: outputMessage });
-            }
-            console.log(`[+] Successfully mirrored to target channel.`);
+            await forwardToTarget(message.channelId, description, realClashLink, imageUrl);
             return true;
         }
     } catch (err) {
@@ -104,12 +90,41 @@ async function handleClashKingMessage(message, isManual = false) {
     return false;
 }
 
+// --- HELPER SEND FUNCTION (FORMATTING UPDATED HERE) ---
+async function forwardToTarget(sourceChannelId, description, link, imageUrl) {
+    try {
+        const targetChannelId = CHANNEL_MAP[sourceChannelId];
+        const targetChannel = await client.channels.fetch(targetChannelId);
+        if (!targetChannel) return;
+
+        // Clean, separated UI for the target channel
+        let outputMessage = 
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `🐉 **NEW CLASH LAYOUT** 🐉\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+            `**📝 Description:**\n` +
+            `${description}\n\n` +
+            `**🔗 Layout Link:**\n` +
+            `<${link}>\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+        
+        if (imageUrl) {
+            await targetChannel.send({ content: outputMessage, files: [imageUrl] });
+        } else {
+            await targetChannel.send({ content: outputMessage });
+        }
+        console.log(`[+] Successfully mirrored to target channel.`);
+    } catch (err) {
+        console.error(`[!] Error sending payload down the line:`, err.message);
+    }
+}
+
 // --- EVENT LISTENERS ---
 client.on('messageCreate', async (message) => {
-    // 1. Direct Message Security Gate
+    // 1. Direct Message Handler
     if (!message.guild && message.author.id !== client.user.id) {
         
-        // SECURITY CHECK: If the sender is NOT you, drop the execution instantly
+        // Security Gate
         if (message.author.id !== ADMIN_ID) {
             console.log(`[Security] Blocked unauthorized DM request from ${message.author.tag}`);
             return; 
@@ -145,7 +160,7 @@ client.on('messageCreate', async (message) => {
         return;
     }
 
-    // 2. Normal Automation (For brand new live bases)
+    // 2. Normal Automation Pipeline
     await handleClashKingMessage(message, false);
 });
 

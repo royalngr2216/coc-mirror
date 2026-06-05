@@ -1,256 +1,136 @@
-const express = require("express");
-const fs = require("fs");
-const axios = require("axios");
-const { Client } = require("discord.js-selfbot-v13");
+const { Client } = require('discord.js-selfbot-v13');
+const express = require('express');
 
+// --- CONFIGURATION ---
+const SOURCE_CHANNEL_ID = '1478369331376160928';
+const TARGET_CHANNEL_ID = '1512350167209082981';
+const CLASHKING_BOT_ID = '824653933347209227';
+
+// Memory cache to avoid duplicate forwards (Map tracking original message ID)
+const processedMessages = new Set();
+
+const client = new Client({
+    checkUpdate: false // Prevents library update logs on startup
+});
+
+// --- EXPRESS KEEPALIVE SERVER FOR RENDER ---
 const app = express();
+app.get('/', (req, res) => res.send('Automation Bot Is Online'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Keep-alive server listening on port ${PORT}`));
 
-app.get("/", (req, res) => {
-    res.send("Alive");
+// --- CORE BOT LOGIC ---
+client.on('ready', () => {
+    console.log(`Logged in seamlessly as: ${client.user.tag}`);
 });
 
-app.listen(3000, () => {
-    console.log("Web server running");
-});
+// Helper function to process valid ClashKing embeds
+async function handleClashKingMessage(message) {
+    // Avoid double-processing if updates fire rapidly
+    if (processedMessages.has(message.id)) return;
 
-const client = new Client();
+    // Validation checks
+    if (message.channelId !== SOURCE_CHANNEL_ID) return;
+    if (message.author.id !== CLASHKING_BOT_ID) return;
+    if (!message.embeds || message.embeds.length === 0) return;
 
-const TOKEN = process.env.TOKEN;
+    // Check if the message contains action components (buttons)
+    if (!message.components || message.components.length === 0) return;
 
-// SOURCE -> TARGET
-const CHANNELS = {
+    // Find the blue button (Primary or Link types typically found in component rows)
+    let linkButton = null;
+    for (const row of message.components) {
+        linkButton = row.components.find(comp => comp.type === 'BUTTON');
+        if (linkButton) break;
+    }
 
-    "1478369331376160928":
-    "1512350167209082981"
+    if (!linkButton) return;
 
-};
+    // Mark as processed early to prevent double interaction clicks
+    processedMessages.add(message.id);
+    // Cleanup cache after 5 minutes to keep memory lightweight
+    setTimeout(() => processedMessages.delete(message.id), 5 * 60 * 1000);
 
-function wait(ms) {
-
-    return new Promise(resolve =>
-        setTimeout(resolve, ms)
-    );
-
-}
-
-// DUPLICATE PREVENTION
-const processed = new Set();
-
-client.on("ready", () => {
-
-    console.log(
-        `Logged in as ${client.user.username}`
-    );
-
-});
-
-client.on(
-"messageCreate",
-async (message) => {
+    console.log(`[+] Detected ClashKing base post (${message.id}). Attempting to click interaction button...`);
 
     try {
+        // Setup the ephemeral catcher BEFORE clicking so we don't miss the fast gateway event
+        const ephemeralPromise = new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                client.off('messageCreate', ephemeralListener);
+                reject(new Error('Timeout waiting for ClashKing ephemeral response.'));
+            }, 10000); // 10 seconds timeout safeguard
 
-        // ONLY CLASHKING
-        if (
-            message.author.id !==
-            "824653933347209227"
-        ) return;
-
-        // SOURCE CHANNEL ONLY
-        const targetChannelId =
-            CHANNELS[message.channel.id];
-
-        if (!targetChannelId)
-            return;
-
-        // PREVENT DUPLICATES
-        if (
-            processed.has(message.id)
-        ) return;
-
-        processed.add(message.id);
-
-        // WAIT FOR EMBEDS
-        await wait(12000);
-
-        // REFETCH FULL MESSAGE
-        message =
-        await message.channel.messages.fetch(
-            message.id
-        );
-
-        // TARGET CHANNEL
-        const target =
-        await client.channels.fetch(
-            targetChannelId
-        );
-
-        let description =
-            message.content || "";
-
-        let imageUrl = null;
-
-        // IMAGE FROM ATTACHMENTS
-        if (
-            message.attachments.size > 0
-        ) {
-
-            const first =
-            message.attachments.first();
-
-            imageUrl = first.url;
-
-        }
-
-        // IMAGE FROM EMBED
-        if (
-            !imageUrl &&
-            message.embeds.length > 0
-        ) {
-
-            const embed =
-            message.embeds[0];
-
-            if (
-                embed.image?.url
-            ) {
-
-                imageUrl =
-                embed.image.url;
-
-            }
-
-        }
-
-        // ===== FIND REAL LINK =====
-
-        let baseLink = null;
-
-        const raw =
-        JSON.stringify(
-            message,
-            null,
-            2
-        );
-
-        console.log(raw);
-
-        const matches =
-        raw.match(
-/https:\/\/link\.clashofclans\.com\/en\?action=OpenLayout&id=[A-Za-z0-9%:_\-]+/g
-        );
-
-        if (
-            matches &&
-            matches.length > 0
-        ) {
-
-            baseLink =
-            matches[0]
-                .replace(
-                    /\\u0026/g,
-                    "&"
-                )
-                .replace(
-                    /\\/g,
-                    ""
-                );
-
-        }
-
-        console.log(
-            "FOUND BASE LINK:"
-        );
-
-        console.log(baseLink);
-
-        // DOWNLOAD IMAGE
-        let tempFile = null;
-
-        if (imageUrl) {
-
-            const response =
-            await axios({
-
-                url: imageUrl,
-                method: "GET",
-                responseType: "stream"
-
-            });
-
-            tempFile =
-            `temp_${Date.now()}.jpg`;
-
-            const writer =
-            fs.createWriteStream(
-                tempFile
-            );
-
-            response.data.pipe(writer);
-
-            await new Promise(
-                (resolve, reject) => {
-
-                    writer.on(
-                        "finish",
-                        resolve
-                    );
-
-                    writer.on(
-                        "error",
-                        reject
-                    );
-
+            const ephemeralListener = (msg) => {
+                // Ephemeral responses will match the author ID and contain the clash link
+                if (msg.author.id === CLASHKING_BOT_ID && msg.content.includes('link.clashofclans.com')) {
+                    clearTimeout(timeout);
+                    client.off('messageCreate', ephemeralListener);
+                    resolve(msg.content);
                 }
-            );
+            };
 
+            client.on('messageCreate', ephemeralListener);
+        });
+
+        // Click the interaction button natively using discord.js-selfbot-v13 mechanics
+        await message.clickButton(linkButton.customId);
+
+        // Wait for the gateway to catch the raw text string containing the URL
+        const rawContent = await ephemeralPromise;
+        const urlMatch = rawContent.match(/https:\/\/link\.clashofclans\.com\/[^\s]+/);
+        
+        if (!urlMatch) {
+            console.log(`[-] Could not parse actual URL from the ephemeral message.`);
+            return;
         }
 
-        // SEND IMAGE FIRST
-        if (tempFile) {
+        const realClashLink = urlMatch[0];
+        console.log(`[+] Successfully intercepted real link: ${realClashLink}`);
 
-            await target.send({
+        // Extract metadata from the original message embed
+        const sourceEmbed = message.embeds[0];
+        const description = sourceEmbed.description || "No description provided.";
+        const imageUrl = sourceEmbed.image ? sourceEmbed.image.url : null;
 
-                content:
-                    description || "",
+        // Build cleanly structured message payload for target channel
+        const targetChannel = await client.channels.fetch(TARGET_CHANNEL_ID);
+        if (!targetChannel) return;
 
-                files:
-                    [tempFile]
-
+        let outputMessage = `**New Base Shared!**\n\n**Description:**\n${description}\n\n**Layout Link:**\n${realClashLink}`;
+        
+        if (imageUrl) {
+            await targetChannel.send({
+                content: outputMessage,
+                files: [imageUrl]
             });
-
-            fs.unlinkSync(tempFile);
-
+        } else {
+            await targetChannel.send({ content: outputMessage });
         }
+        
+        console.log(`[+] Forwarded successfully to target channel.`);
 
-        // WAIT
-        await wait(1500);
-
-        // SEND LINK
-        if (baseLink) {
-
-            await target.send(
-                baseLink
-            );
-
-        }
-
-        console.log(
-            "Forwarded Successfully"
-        );
-
+    } catch (err) {
+        console.error(`[!] Error automating interaction for ${message.id}:`, err.message);
     }
+}
 
-    catch (err) {
-
-        console.log(
-            "ERROR:"
-        );
-
-        console.log(err);
-
-    }
-
+// Hook both Create and Update listeners to handle delayed embed rendering
+client.on('messageCreate', async (message) => {
+    await handleClashKingMessage(message);
 });
 
-client.login(TOKEN);
+client.on('messageUpdate', async (oldMessage, newMessage) => {
+    // If the partial doesn't contain embed data yet, fetch the full content safely
+    if (newMessage.partial) {
+        try {
+            newMessage = await newMessage.fetch();
+        } catch (e) {
+            return;
+        }
+    }
+    await handleClashKingMessage(newMessage);
+});
+
+// Run automation cleanly
+client.login(process.env.DISCORD_TOKEN);

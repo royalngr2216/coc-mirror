@@ -41,7 +41,7 @@ async function handleClashKingMessage(message) {
 
     console.log(`[+] Found new base post (${message.id}). Extracting...`);
 
-    // 1. Get the Description (e.g., "hii" from your screenshot)
+    // 1. Get the Description
     let description = message.content || "";
 
     // 2. Get the Image (From Embed or Attachment)
@@ -55,24 +55,21 @@ async function handleClashKingMessage(message) {
     try {
         console.log(`[+] Clicking the 'Link' button programmatically...`);
         
-        // 3. Setup listener to catch the ephemeral response shown in your 2nd screenshot
+        // 3. Setup listener to catch the ephemeral response
         const ephemeralPromise = new Promise((resolve) => {
             const timeout = setTimeout(() => resolve(null), 15000); // Wait up to 15 seconds
 
             const linkCatcher = (msg) => {
-                // Check if the new message is from ClashKing and contains the base link
                 if (msg.author.id === CLASHKING_BOT_ID && msg.content.includes('link.clashofclans.com')) {
-                    // Match the complete URL including all special/encoded characters
                     const match = msg.content.match(/https:\/\/link\.clashofclans\.com\/\S+/);
                     if (match) {
                         clearTimeout(timeout);
                         client.off('messageCreate', linkCatcher);
-                        resolve(match[0]); // Resolve with the exact link
+                        resolve(match[0]); 
                     }
                 }
             };
 
-            // Listen for new messages (which includes ephemeral interaction replies)
             client.on('messageCreate', linkCatcher);
         });
 
@@ -94,10 +91,10 @@ async function handleClashKingMessage(message) {
 
         console.log(`[+] Successfully extracted Link: ${realClashLink}`);
         
-        // Cleanly format the text and the link
-        let outputMessage = `**New Base Shared!**\n\n**Description:**\n${description}\n\n**Layout Link:**\n${realClashLink}`;
+        // Wrap the link in < > to suppress the automatic Clash of Clans embed preview
+        let outputMessage = `**New Base Shared!**\n\n**Description:**\n${description}\n\n**Layout Link:**\n<${realClashLink}>`;
         
-        // Send to target channel (Discord will automatically put the image below this text)
+        // Send to target channel
         if (imageUrl) {
             await targetChannel.send({ 
                 content: outputMessage, 

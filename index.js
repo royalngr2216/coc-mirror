@@ -2,6 +2,9 @@ const { Client } = require('discord.js-selfbot-v13');
 const express = require('express');
 
 // --- CONFIGURATION ---
+// ⚠️ REPLACE THIS with your main Discord account ID (Right-click your profile -> Copy User ID)
+const ADMIN_ID = '1287545546231255092'; 
+
 const CHANNEL_MAP = {
     '1397976773773492345': '1512370311071531162', // TH11
     '1397976994209333278': '1512370360824107018', // TH12
@@ -14,9 +17,7 @@ const CHANNEL_MAP = {
 };
 
 const CLASHKING_BOT_ID = '824653933347209227';
-
 const processedMessages = new Set();
-const processedLinks = new Set(); // Tracks forwarded links to prevent duplicates
 const client = new Client({ checkUpdate: false });
 
 // --- EXPRESS SERVER (UPTIMEROBOT) ---
@@ -27,16 +28,18 @@ app.listen(PORT, () => console.log(`[Express] Keep-alive active on port ${PORT}`
 
 client.on('ready', () => console.log(`[Discord] Authenticated successfully as: ${client.user.tag}`));
 
-// --- CORE PIPELINE FOR AUTOMATIC LATEST POSTS ---
-async function handleClashKingMessage(message) {
-    if (processedMessages.has(message.id)) return;
-    if (message.author.id !== CLASHKING_BOT_ID) return;
-    if (!CHANNEL_MAP[message.channelId]) return;
+// --- CORE PIPELINE ---
+async function handleClashKingMessage(message, isManual = false) {
+    if (processedMessages.has(message.id)) return false;
+    if (message.author.id !== CLASHKING_BOT_ID) return false;
+    if (!CHANNEL_MAP[message.channelId]) return false;
 
-    // CRUCIAL FIX: Ignore the message entirely if it was originally posted more than 2 minutes ago
-    // This stops download counter updates on old messages from triggering the bot automatically
-    const messageAge = Date.now() - message.createdTimestamp;
-    if (messageAge > 120000) return; 
+    // Ignore the message entirely if it was originally posted more than 2 minutes ago
+    // Unless you manually requested it via DM
+    if (!isManual) {
+        const messageAge = Date.now() - message.createdTimestamp;
+        if (messageAge > 120000) return false; 
+    }
 
     let linkButton = null;
     if (message.components) {
@@ -46,12 +49,12 @@ async function handleClashKingMessage(message) {
         }
     }
 
-    if (!linkButton) return;
+    if (!linkButton) return false;
 
     processedMessages.add(message.id);
     setTimeout(() => processedMessages.delete(message.id), 5 * 60 * 1000);
 
-    console.log(`[+] Automated: New active base detected (${message.id}). Processing...`);
+    console.log(`[+] Processing base layout (${message.id})...`);
 
     let description = message.content || "";
     let imageUrl = null;
@@ -81,86 +84,76 @@ async function handleClashKingMessage(message) {
         const realClashLink = await ephemeralPromise;
         
         if (realClashLink) {
-            processedLinks.add(realClashLink); // Log to prevent manual listener double-firing
-            await forwardToTarget(message.channelId, description, realClashLink, imageUrl);
+            const targetChannelId = CHANNEL_MAP[message.channelId];
+            const targetChannel = await client.channels.fetch(targetChannelId);
+            if (!targetChannel) return false;
+
+            let outputMessage = `**New Base Shared!**\n\n**Description:**\n${description}\n\n**Layout Link:**\n<${realClashLink}>`;
+            
+            if (imageUrl) {
+                await targetChannel.send({ content: outputMessage, files: [imageUrl] });
+            } else {
+                await targetChannel.send({ content: outputMessage });
+            }
+            console.log(`[+] Successfully mirrored to target channel.`);
+            return true;
         }
     } catch (err) {
         console.error(`[!] Automation error on message ${message.id}:`, err.message);
     }
+    return false;
 }
 
-// --- GLOBAL CATCHER FOR MANUAL CLICKS ON OLD MESSAGES ---
-client.on('messageCreate', async (msg) => {
-    // Only looking for ClashKing links landing in our monitored channels
-    if (msg.author.id !== CLASHKING_BOT_ID) return;
-    if (!msg.content.includes('link.clashofclans.com')) return;
-    if (!CHANNEL_MAP[msg.channelId]) return;
-
-    const match = msg.content.match(/https:\/\/link\.clashofclans\.com\/\S+/);
-    if (!match) return;
-    const realClashLink = match[0];
-
-    // If this link was already handled by the auto-mode loop above, skip it
-    if (processedLinks.has(realClashLink)) return;
-    processedLinks.add(realClashLink);
-    setTimeout(() => processedLinks.delete(realClashLink), 30000);
-
-    console.log(`[+] Manual Action: Detected link from your physical button click. Fetching context...`);
-
-    let description = "Manually Selected Layout";
-    let imageUrl = null;
-
-    try {
-        // Look through the last 10 messages in the channel to find the base layout card you clicked on
-        const historicalMessages = await msg.channel.messages.fetch({ limit: 10 });
-        const layoutContext = historicalMessages.find(m => m.author.id === CLASHKING_BOT_ID && (m.attachments.size > 0 || m.embeds.length > 0));
+// --- EVENT LISTENERS ---
+client.on('messageCreate', async (message) => {
+    // 1. Direct Message Security Gate
+    if (!message.guild && message.author.id !== client.user.id) {
         
-        if (layoutContext) {
-            description = layoutContext.content || description;
-            if (layoutContext.attachments.size > 0) {
-                imageUrl = layoutContext.attachments.first().url;
-            } else if (layoutContext.embeds.length > 0 && layoutContext.embeds[0].image) {
-                imageUrl = layoutContext.embeds[0].image.url;
+        // SECURITY CHECK: If the sender is NOT you, drop the execution instantly
+        if (message.author.id !== ADMIN_ID) {
+            console.log(`[Security] Blocked unauthorized DM request from ${message.author.tag}`);
+            return; 
+        }
+
+        if (message.content.includes('discord.com/channels/')) {
+            const match = message.content.match(/channels\/[0-9]+\/([0-9]+)\/([0-9]+)/);
+            if (match) {
+                const channelId = match[1];
+                const messageId = match[2];
+
+                if (!CHANNEL_MAP[channelId]) {
+                    return message.reply("[-] The channel in that link is not tracked in the CHANNEL_MAP.");
+                }
+
+                try {
+                    await message.reply("[+] Fetching base layout, please wait...");
+                    const sourceChannel = await client.channels.fetch(channelId);
+                    const targetMessage = await sourceChannel.messages.fetch(messageId);
+                    
+                    const success = await handleClashKingMessage(targetMessage, true);
+                    if (success) {
+                        await message.reply("✅ Successfully extracted and forwarded the layout to your server!");
+                    } else {
+                        await message.reply("❌ Failed to process. The link timed out or it isn't a valid base post.");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    await message.reply("❌ Could not find that message. Make sure the link is correct.");
+                }
             }
         }
-    } catch (e) {
-        console.log(`[-] Could not find past layout details:`, e.message);
+        return;
     }
 
-    await forwardToTarget(msg.channelId, description, realClashLink, imageUrl);
-});
-
-// --- HELPER SEND FUNCTION ---
-async function forwardToTarget(sourceChannelId, description, link, imageUrl) {
-    try {
-        const targetChannelId = CHANNEL_MAP[sourceChannelId];
-        const targetChannel = await client.channels.fetch(targetChannelId);
-        if (!targetChannel) return;
-
-        let outputMessage = `**New Base Shared!**\n\n**Description:**\n${description}\n\n**Layout Link:**\n<${link}>`;
-        
-        if (imageUrl) {
-            await targetChannel.send({ content: outputMessage, files: [imageUrl] });
-        } else {
-            await targetChannel.send({ content: outputMessage });
-        }
-        console.log(`[+] Successfully mirrored to target channel.`);
-    } catch (err) {
-        console.error(`[!] Error sending payload down the line:`, err.message);
-    }
-}
-
-// Gateway Initialization Event Ties
-client.on('messageCreate', async (message) => {
-    await handleClashKingMessage(message);
+    // 2. Normal Automation (For brand new live bases)
+    await handleClashKingMessage(message, false);
 });
 
 client.on('messageUpdate', async (oldMessage, newMessage) => {
     if (newMessage.partial) {
         try { newMessage = await newMessage.fetch(); } catch (e) { return; }
     }
-    await handleClashKingMessage(newMessage);
+    await handleClashKingMessage(newMessage, false);
 });
 
 client.login(process.env.DISCORD_TOKEN);
-                        

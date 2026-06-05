@@ -9,38 +9,47 @@ app.listen(3000, () => {
     console.log("Web server running");
 });
 
-const { Client } = require("discord.js-selfbot-v13");
+const { Client } =
+require("discord.js-selfbot-v13");
 
 const client = new Client();
 
 const TOKEN = process.env.TOKEN;
 
-// SOURCE CHANNEL ID : DESTINATION CHANNEL ID
+// SOURCE : DESTINATION
 const CHANNELS = {
 
     // TH11
-    "SOURCE_TH11_ID": "DEST_TH11_ID",
+    "SOURCE_TH11_ID":
+    "DEST_TH11_ID",
 
     // TH12
-    "SOURCE_TH12_ID": "DEST_TH12_ID",
+    "SOURCE_TH12_ID":
+    "DEST_TH12_ID",
 
     // TH13
-    "SOURCE_TH13_ID": "DEST_TH13_ID",
+    "SOURCE_TH13_ID":
+    "DEST_TH13_ID",
 
     // TH14
-    "1478369331376160928": "1512350167209082981",
+    "1478369331376160928":
+    "1512350167209082981",
 
     // TH15
-    "1478369429380137222": "1512350167209082981",
+    "1478369429380137222":
+    "1512350167209082981",
 
     // TH16
-    "SOURCE_TH16_ID": "DEST_TH16_ID",
+    "SOURCE_TH16_ID":
+    "DEST_TH16_ID",
 
     // TH17
-    "SOURCE_TH17_ID": "DEST_TH17_ID",
+    "SOURCE_TH17_ID":
+    "DEST_TH17_ID",
 
     // TH18
-    "SOURCE_TH18_ID": "DEST_TH18_ID"
+    "SOURCE_TH18_ID":
+    "DEST_TH18_ID"
 
 };
 
@@ -52,7 +61,9 @@ client.on("ready", () => {
 
 });
 
-client.on("messageCreate", async (msg) => {
+client.on(
+"messageCreate",
+async (msg) => {
 
     try {
 
@@ -62,14 +73,14 @@ client.on("messageCreate", async (msg) => {
             "824653933347209227"
         ) return;
 
-        // FIND TARGET CHANNEL
+        // TARGET CHANNEL
         const targetChannelId =
             CHANNELS[msg.channel.id];
 
         if (!targetChannelId)
             return;
 
-        // FETCH TARGET CHANNEL
+        // FETCH TARGET
         const targetChannel =
             await client.channels.fetch(
                 targetChannelId
@@ -84,20 +95,25 @@ client.on("messageCreate", async (msg) => {
         );
 
         // REFETCH MESSAGE
-        msg = await msg.channel.messages.fetch(
+        msg =
+        await msg.channel.messages.fetch(
             msg.id
         );
 
-        // MESSAGE TEXT
+        // TEXT
         let content =
             msg.content || "";
 
-        // GET BASE LINK
+        // BASE LINK
         let baseLink = null;
 
+        // FROM BUTTONS
         if (msg.components?.length) {
 
-            for (const row of msg.components) {
+            for (
+                const row
+                of msg.components
+            ) {
 
                 for (
                     const component
@@ -117,7 +133,47 @@ client.on("messageCreate", async (msg) => {
 
         }
 
-        // GET FILES
+        // FROM EMBEDS
+        if (
+            !baseLink &&
+            msg.embeds.length > 0
+        ) {
+
+            for (
+                const embed
+                of msg.embeds
+            ) {
+
+                // EMBED URL
+                if (embed.url) {
+
+                    baseLink =
+                        embed.url;
+
+                }
+
+                // DESCRIPTION URL
+                if (
+                    !baseLink &&
+                    embed.description
+                ) {
+
+                    const found =
+                    embed.description.match(
+                        /(https?:\/\/[^\s]+)/g
+                    );
+
+                    if (found)
+                        baseLink =
+                            found[0];
+
+                }
+
+            }
+
+        }
+
+        // FILES
         let files = [];
 
         msg.attachments.forEach(a => {
@@ -126,8 +182,9 @@ client.on("messageCreate", async (msg) => {
 
         });
 
-        // FINAL TEXT
-        let finalMessage = content;
+        // FINAL MESSAGE
+        let finalMessage =
+            content;
 
         if (baseLink) {
 
@@ -136,7 +193,7 @@ client.on("messageCreate", async (msg) => {
 
         }
 
-        // SEND MESSAGE
+        // SEND
         await targetChannel.send({
 
             content:

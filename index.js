@@ -1,3 +1,14 @@
+const express = require("express");
+const app = express();
+
+app.get("/", (req, res) => {
+    res.send("Bot alive");
+});
+
+app.listen(3000, () => {
+    console.log("Web server running");
+});
+
 const { Client } = require("discord.js-selfbot-v13");
 const axios = require("axios");
 const FormData = require("form-data");

@@ -1,4 +1,8 @@
 const express = require("express");
+const fs = require("fs");
+const axios = require("axios");
+const { Client } = require("discord.js-selfbot-v13");
+
 const app = express();
 
 app.get("/", (req, res) => {
@@ -9,29 +13,29 @@ app.listen(3000, () => {
     console.log("Web server running");
 });
 
-const {
-    Client
-} = require("discord.js-selfbot-v13");
-
 const client = new Client();
 
 const TOKEN = process.env.TOKEN;
 
-// SOURCE : DESTINATION
+// SOURCE -> TARGET
 const CHANNELS = {
 
     // TH14
     "1478369331376160928":
-    "1512350167209082981",
-
-    // TH15
-    "1478369429380137222":
     "1512350167209082981"
 
 };
 
+function wait(ms) {
+
+    return new Promise(resolve =>
+        setTimeout(resolve, ms)
+    );
+
+}
+
 // PREVENT DUPLICATES
-const done = new Set();
+const processed = new Set();
 
 client.on("ready", () => {
 
@@ -41,154 +45,178 @@ client.on("ready", () => {
 
 });
 
-async function processMessage(msg) {
+client.on(
+"messageCreate",
+async (message) => {
 
     try {
 
         // ONLY CLASHKING
         if (
-            msg.author.id !==
+            message.author.id !==
             "824653933347209227"
         ) return;
 
-        // AVOID DUPLICATES
-        if (done.has(msg.id))
-            return;
-
-        // MUST BE SOURCE CHANNEL
+        // SOURCE CHANNEL ONLY
         const targetChannelId =
-            CHANNELS[msg.channel.id];
+            CHANNELS[message.channel.id];
 
         if (!targetChannelId)
             return;
 
+        // PREVENT DUPLICATES
+        if (
+            processed.has(message.id)
+        ) return;
+
+        processed.add(message.id);
+
         // WAIT FOR FULL MESSAGE
-        await new Promise(r =>
-            setTimeout(r, 12000)
-        );
+        await wait(12000);
 
         // REFETCH
-        msg =
-        await msg.channel.messages.fetch(
-            msg.id
+        message =
+        await message.channel.messages.fetch(
+            message.id
         );
 
-        // RAW DATA
-        const raw =
-            JSON.stringify(msg);
-
-        // FIND REAL BASE LINK
-        const linkMatch =
-        raw.match(
-        /https:\/\/link\.clashofclans\.com\/en\?action=OpenLayout[^"\s\\]+/g
+        // TARGET CHANNEL
+        const target =
+        await client.channels.fetch(
+            targetChannelId
         );
 
-        let realLink = null;
+        // DESCRIPTION
+        let description =
+            message.content || "";
 
+        // IMAGE
+        let imageUrl = null;
+
+        // ATTACHMENTS
         if (
-            linkMatch &&
-            linkMatch[0]
+            message.attachments.size > 0
         ) {
 
-            realLink = linkMatch[0]
+            const first =
+            message.attachments.first();
+
+            imageUrl = first.url;
+
+        }
+
+        // REAL BASE LINK
+        let baseLink = null;
+
+        // SEARCH EVERYWHERE
+        const raw =
+            JSON.stringify(message);
+
+        const match =
+        raw.match(
+        /https:\/\/link\.clashofclans\.com\/en\?action=OpenLayout[^"\\ ]+/i
+        );
+
+        if (
+            match &&
+            match[0]
+        ) {
+
+            baseLink = match[0]
                 .replace(/\\u0026/g, "&")
                 .replace(/\\/g, "");
 
         }
 
-        // IMAGE FILES
-        let files = [];
-
-        msg.attachments.forEach(a => {
-
-            if (
-                a.contentType &&
-                a.contentType.startsWith(
-                    "image"
-                )
-            ) {
-
-                files.push(a.url);
-
-            }
-
-        });
-
-        // NO IMAGE + NO LINK
-        if (
-            files.length === 0 &&
-            !realLink
-        ) return;
-
-        const targetChannel =
-        await client.channels.fetch(
-            targetChannelId
+        console.log(
+            "FOUND LINK:",
+            baseLink
         );
 
-        // MARK DONE
-        done.add(msg.id);
+        // DOWNLOAD IMAGE
+        let tempFile = null;
 
-        // SEND IMAGE FIRST
-        if (files.length > 0) {
+        if (imageUrl) {
 
-            await targetChannel.send({
+            const response =
+            await axios({
 
-                files: files
+                url: imageUrl,
+                method: "GET",
+                responseType: "stream"
 
             });
 
+            tempFile =
+            `temp_${Date.now()}.jpg`;
+
+            const writer =
+            fs.createWriteStream(
+                tempFile
+            );
+
+            response.data.pipe(writer);
+
+            await new Promise(
+                (resolve, reject) => {
+
+                    writer.on(
+                        "finish",
+                        resolve
+                    );
+
+                    writer.on(
+                        "error",
+                        reject
+                    );
+
+                }
+            );
+
         }
 
-        // WAIT 1 SECOND
-        await new Promise(r =>
-            setTimeout(r, 1000)
+        // SEND IMAGE FIRST
+        if (tempFile) {
+
+            await target.send({
+
+                content:
+                    description || "",
+
+                files:
+                    [tempFile]
+
+            });
+
+            fs.unlinkSync(tempFile);
+
+        }
+
+        // WAIT
+        await wait(1500);
+
+        // SEND LINK SEPARATELY
+        if (baseLink) {
+
+            await target.send(
+                baseLink
+            );
+
+        }
+
+        console.log(
+            "Successfully copied base"
         );
 
-        // SEND REAL LINK
-        if (realLink) {
+    }
 
-            await targetChannel.send(
-                realLink
-            );
+    catch (err) {
 
-            console.log(
-                "Sent real link"
-            );
-
-        } else {
-
-            console.log(
-                "No real link found"
-            );
-
-        }
-
-    } catch (err) {
-
+        console.log("ERROR:");
         console.log(err);
 
     }
 
-}
-
-// NEW MESSAGE
-client.on(
-    "messageCreate",
-    async (msg) => {
-
-        processMessage(msg);
-
-    }
-);
-
-// EDITED MESSAGE
-client.on(
-    "messageUpdate",
-    async (oldMsg, newMsg) => {
-
-        processMessage(newMsg);
-
-    }
-);
+});
 
 client.login(TOKEN);

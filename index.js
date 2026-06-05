@@ -17,7 +17,7 @@ const client = new Client();
 
 const TOKEN = process.env.TOKEN;
 
-// SOURCE CHANNEL : DESTINATION CHANNEL
+// SOURCE : DESTINATION
 const CHANNELS = {
 
     // TH14
@@ -30,6 +30,9 @@ const CHANNELS = {
 
 };
 
+// PREVENT DUPLICATES
+const done = new Set();
+
 client.on("ready", () => {
 
     console.log(
@@ -38,9 +41,7 @@ client.on("ready", () => {
 
 });
 
-client.on(
-"messageCreate",
-async (msg) => {
+async function processMessage(msg) {
 
     try {
 
@@ -50,42 +51,84 @@ async (msg) => {
             "824653933347209227"
         ) return;
 
-        // FIND TARGET CHANNEL
+        // AVOID DUPLICATES
+        if (done.has(msg.id))
+            return;
+
+        // MUST BE SOURCE CHANNEL
         const targetChannelId =
             CHANNELS[msg.channel.id];
 
         if (!targetChannelId)
             return;
 
-        const targetChannel =
-            await client.channels.fetch(
-                targetChannelId
-            );
-
-        if (!targetChannel)
-            return;
-
-        // WAIT FOR MESSAGE TO FULLY LOAD
-        await new Promise(resolve =>
-            setTimeout(resolve, 5000)
+        // WAIT FOR FULL MESSAGE
+        await new Promise(r =>
+            setTimeout(r, 12000)
         );
 
-        // REFETCH MESSAGE
+        // REFETCH
         msg =
         await msg.channel.messages.fetch(
             msg.id
         );
+
+        // RAW DATA
+        const raw =
+            JSON.stringify(msg);
+
+        // FIND REAL BASE LINK
+        const linkMatch =
+        raw.match(
+        /https:\/\/link\.clashofclans\.com\/en\?action=OpenLayout[^"\s\\]+/g
+        );
+
+        let realLink = null;
+
+        if (
+            linkMatch &&
+            linkMatch[0]
+        ) {
+
+            realLink = linkMatch[0]
+                .replace(/\\u0026/g, "&")
+                .replace(/\\/g, "");
+
+        }
 
         // IMAGE FILES
         let files = [];
 
         msg.attachments.forEach(a => {
 
-            files.push(a.url);
+            if (
+                a.contentType &&
+                a.contentType.startsWith(
+                    "image"
+                )
+            ) {
+
+                files.push(a.url);
+
+            }
 
         });
 
-        // SEND IMAGE ONLY
+        // NO IMAGE + NO LINK
+        if (
+            files.length === 0 &&
+            !realLink
+        ) return;
+
+        const targetChannel =
+        await client.channels.fetch(
+            targetChannelId
+        );
+
+        // MARK DONE
+        done.add(msg.id);
+
+        // SEND IMAGE FIRST
         if (files.length > 0) {
 
             await targetChannel.send({
@@ -96,34 +139,10 @@ async (msg) => {
 
         }
 
-        // EXTRA WAIT
-        await new Promise(resolve =>
-            setTimeout(resolve, 1000)
+        // WAIT 1 SECOND
+        await new Promise(r =>
+            setTimeout(r, 1000)
         );
-
-        // GET REAL LINK
-        let raw = "";
-
-        raw += JSON.stringify(msg);
-        raw += JSON.stringify(msg.embeds);
-        raw += JSON.stringify(msg.components);
-        raw += JSON.stringify(msg.interaction);
-
-        const match =
-        raw.match(
-        /https:\/\/link\.clashofclans\.com\/en\?action=OpenLayout[^\s"]+/g
-        );
-
-        let realLink = null;
-
-        if (
-            match &&
-            match[0]
-        ) {
-
-            realLink = match[0];
-
-        }
 
         // SEND REAL LINK
         if (realLink) {
@@ -133,7 +152,7 @@ async (msg) => {
             );
 
             console.log(
-                "Real base link sent"
+                "Sent real link"
             );
 
         } else {
@@ -146,11 +165,30 @@ async (msg) => {
 
     } catch (err) {
 
-        console.log("ERROR:");
         console.log(err);
 
     }
 
-});
+}
+
+// NEW MESSAGE
+client.on(
+    "messageCreate",
+    async (msg) => {
+
+        processMessage(msg);
+
+    }
+);
+
+// EDITED MESSAGE
+client.on(
+    "messageUpdate",
+    async (oldMsg, newMsg) => {
+
+        processMessage(newMsg);
+
+    }
+);
 
 client.login(TOKEN);

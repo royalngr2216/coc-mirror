@@ -18,11 +18,13 @@ const TOKEN = process.env.TOKEN;
 // SOURCE CHANNEL : DESTINATION CHANNEL
 const CHANNELS = {
 
-    // TH14
-    "1478369331376160928": "1512350167209082981",
+    // TH14 SOURCE -> YOUR TH14 CHANNEL
+    "1478369331376160928":
+    "1512350167209082981",
 
-    // TH15
-    "1478369429380137222": "1512350167209082981"
+    // TH15 SOURCE -> YOUR TH15 CHANNEL
+    "1478369429380137222":
+    "1512350167209082981"
 
 };
 
@@ -44,24 +46,32 @@ client.on("messageCreate", async (msg) => {
             "824653933347209227"
         ) return;
 
-        // TARGET CHANNEL
+        // FIND DESTINATION
         const targetChannelId =
             CHANNELS[msg.channel.id];
 
         if (!targetChannelId)
             return;
 
-        // GET CHANNEL
+        // GET DESTINATION CHANNEL
         const targetChannel =
-            client.channels.cache.get(
+            await client.channels.fetch(
                 targetChannelId
             );
 
         if (!targetChannel)
             return;
 
-        // FORWARD ORIGINAL MESSAGE
-        await msg.forward(targetChannel);
+        // REFETCH FULL MESSAGE
+        const fullMessage =
+            await msg.channel.messages.fetch(
+                msg.id
+            );
+
+        // FORWARD
+        await fullMessage.forward(
+            targetChannel
+        );
 
         console.log(
             `Forwarded from ${msg.channel.name}`

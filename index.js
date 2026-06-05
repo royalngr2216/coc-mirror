@@ -2,7 +2,7 @@ const express = require("express");
 const app = express();
 
 app.get("/", (req, res) => {
-    res.send("Bot alive");
+    res.send("Bot Alive");
 });
 
 app.listen(3000, () => {
@@ -10,46 +10,37 @@ app.listen(3000, () => {
 });
 
 const { Client } = require("discord.js-selfbot-v13");
-const axios = require("axios");
 
 const client = new Client();
 
 const TOKEN = process.env.TOKEN;
 
-// SOURCE CHANNEL ID : WEBHOOK URL
-const WEBHOOKS = {
+// SOURCE CHANNEL ID : DESTINATION CHANNEL ID
+const CHANNELS = {
 
     // TH11
-    "1397976773773492345":
-    "https://discord.com/api/webhooks/1512371730029744159/MQmLBlpg4C6HMQ-TPSAmf6zvvImo3gdINwLh911lMwgjt_DqKHg44-d-0sMxKRM1thMO",
+    "SOURCE_TH11_ID": "DEST_TH11_ID",
 
     // TH12
-    "1397976994209333278":
-    "https://discord.com/api/webhooks/1512371917149966346/N1JwN7f1-wMzK4WsFL9PrwIAIWC6E8-RJED8UzWNuCz2siyGS1gg0Ns3Vhj30R00BDqT",
+    "SOURCE_TH12_ID": "DEST_TH12_ID",
 
     // TH13
-    "1397977231862665387":
-    "https://discord.com/api/webhooks/1512372070225285121/bHdz3_sliItJrkh97iY8p10jMHxjquxwyIloQK-ukcsSOMVXUEcKiFPn4D3kgOH2hZSr",
+    "SOURCE_TH13_ID": "DEST_TH13_ID",
 
     // TH14
-    "1478369331376160928":
-    "https://discord.com/api/webhooks/1512350198133817476/fRkeFqeM_bLqbGplFj1E6Oy59ewN0EHY0IeGgBKHEkPm3ELcRCp6AxRzpJv8Hwz9LkK9",
+    "1478369331376160928": "1512350167209082981",
 
     // TH15
-    "1397977306009571489":
-    "https://discord.com/api/webhooks/1512372204879347722/FU_1n_I-DtuzwwVtOmRDcHcv-wOs1_fqp2eRpt_bFH8uzmeGDN__1vcspZa0ejsseD42",
+    "SOURCE_TH15_ID": "DEST_TH15_ID",
 
     // TH16
-    "1397977323227185284":
-    "https://discord.com/api/webhooks/1512372370042654752/93llRhknMdmlaEz6DI6aC6GFjy_2wOsKLc5r7CLHd_d-DrurxqczmSVsiRAU3WC4sw8M",
+    "SOURCE_TH16_ID": "DEST_TH16_ID",
 
     // TH17
-    "1397977380022386789":
-    "https://discord.com/api/webhooks/1512372504625152040/TB4yW3MJ6yZ8cm1QZbfl77JyEhIuaXPu1xYwSaE6bWOXZys6xq3LTBVtn7S3E4Q6uzeA",
+    "SOURCE_TH17_ID": "DEST_TH17_ID",
 
     // TH18
-    "1440934909043544185":
-    "https://discord.com/api/webhooks/1512372669562224801/aQ63Nqnhh1wBptJ0lZDp1bPU0RkwirVP5qwCrLk2rvLDIIdbw61WIERBvKdi-59Mj-81"
+    "SOURCE_TH18_ID": "DEST_TH18_ID"
 
 };
 
@@ -61,29 +52,33 @@ client.on("ready", () => {
 
 client.on("messageCreate", async (msg) => {
 
-    // Only ClashKing bot
-    if (msg.author.id !== "824653933347209227") return;
-
-    // Find webhook
-    const webhook = WEBHOOKS[msg.channel.id];
-
-    if (!webhook) return;
-
     try {
 
-        const messageLink =
-            `https://discord.com/channels/` +
-            `${msg.guild.id}/` +
-            `${msg.channel.id}/` +
-            `${msg.id}`;
+        // ONLY CLASHKING BOT
+        if (msg.author.id !== "824653933347209227")
+            return;
 
-        await axios.post(webhook, {
+        // FIND TARGET CHANNEL
+        const targetChannelId =
+            CHANNELS[msg.channel.id];
 
-            content: messageLink
+        if (!targetChannelId)
+            return;
 
-        });
+        const targetChannel =
+            client.channels.cache.get(
+                targetChannelId
+            );
 
-        console.log("Forwarded ClashKing message");
+        if (!targetChannel)
+            return;
+
+        // FORWARD MESSAGE
+        await msg.forward(targetChannel);
+
+        console.log(
+            `Forwarded from ${msg.channel.name}`
+        );
 
     } catch (err) {
 

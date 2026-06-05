@@ -9,23 +9,38 @@ app.listen(3000, () => {
     console.log("Web server running");
 });
 
-const { Client } =
-require("discord.js-selfbot-v13");
+const { Client } = require("discord.js-selfbot-v13");
 
 const client = new Client();
 
 const TOKEN = process.env.TOKEN;
 
-// SOURCE CHANNEL : DESTINATION CHANNEL
+// SOURCE CHANNEL ID : DESTINATION CHANNEL ID
 const CHANNELS = {
 
+    // TH11
+    "SOURCE_TH11_ID": "DEST_TH11_ID",
+
+    // TH12
+    "SOURCE_TH12_ID": "DEST_TH12_ID",
+
+    // TH13
+    "SOURCE_TH13_ID": "DEST_TH13_ID",
+
     // TH14
-    "1478369331376160928":
-    "1512350167209082981",
+    "1478369331376160928": "1512350167209082981",
 
     // TH15
-    "1478369429380137222":
-    "1512350167209082981"
+    "1478369429380137222": "1512350167209082981",
+
+    // TH16
+    "SOURCE_TH16_ID": "DEST_TH16_ID",
+
+    // TH17
+    "SOURCE_TH17_ID": "DEST_TH17_ID",
+
+    // TH18
+    "SOURCE_TH18_ID": "DEST_TH18_ID"
 
 };
 
@@ -54,7 +69,7 @@ client.on("messageCreate", async (msg) => {
         if (!targetChannelId)
             return;
 
-        // GET TARGET CHANNEL
+        // FETCH TARGET CHANNEL
         const targetChannel =
             await client.channels.fetch(
                 targetChannelId
@@ -63,6 +78,16 @@ client.on("messageCreate", async (msg) => {
         if (!targetChannel)
             return;
 
+        // WAIT 5 SECONDS
+        await new Promise(resolve =>
+            setTimeout(resolve, 5000)
+        );
+
+        // REFETCH MESSAGE
+        msg = await msg.channel.messages.fetch(
+            msg.id
+        );
+
         // MESSAGE TEXT
         let content =
             msg.content || "";
@@ -70,10 +95,7 @@ client.on("messageCreate", async (msg) => {
         // GET BASE LINK
         let baseLink = null;
 
-        if (
-            msg.components &&
-            msg.components.length > 0
-        ) {
+        if (msg.components?.length) {
 
             for (const row of msg.components) {
 
@@ -82,9 +104,7 @@ client.on("messageCreate", async (msg) => {
                     of row.components
                 ) {
 
-                    if (
-                        component.url
-                    ) {
+                    if (component.url) {
 
                         baseLink =
                             component.url;
@@ -97,7 +117,7 @@ client.on("messageCreate", async (msg) => {
 
         }
 
-        // IMAGE FILES
+        // GET FILES
         let files = [];
 
         msg.attachments.forEach(a => {
@@ -106,22 +126,21 @@ client.on("messageCreate", async (msg) => {
 
         });
 
-        // FINAL MESSAGE
-        let finalMessage =
-            content;
+        // FINAL TEXT
+        let finalMessage = content;
 
         if (baseLink) {
 
             finalMessage +=
-`\n\n🔗 Base Link:
-${baseLink}`;
+`\n\n🔗 Base Link:\n${baseLink}`;
 
         }
 
         // SEND MESSAGE
         await targetChannel.send({
 
-            content: finalMessage,
+            content:
+                finalMessage || null,
 
             files: files
 

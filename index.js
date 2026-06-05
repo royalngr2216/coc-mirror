@@ -19,29 +19,9 @@ const TOKEN = process.env.TOKEN;
 
 const WEBHOOKS = {
 
-    // TH11
-    "SOURCE_CHANNEL_ID_TH11": "WEBHOOK_URL_TH11",
-
-    // TH12
-    "SOURCE_CHANNEL_ID_TH12": "WEBHOOK_URL_TH12",
-
-    // TH13
-    "SOURCE_CHANNEL_ID_TH13": "WEBHOOK_URL_TH13",
-
     // TH14
-    "1478369331376160928": "https://discord.com/api/webhooks/1512350198133817476/fRkeFqeM_bLqbGplFj1E6Oy59ewN0EHY0IeGgBKHEkPm3ELcRCp6AxRzpJv8Hwz9LkK9",
-
-    // TH15
-    "SOURCE_CHANNEL_ID_TH15": "WEBHOOK_URL_TH15",
-
-    // TH16
-    "SOURCE_CHANNEL_ID_TH16": "WEBHOOK_URL_TH16",
-
-    // TH17
-    "SOURCE_CHANNEL_ID_TH17": "WEBHOOK_URL_TH17",
-
-    // TH18
-    "SOURCE_CHANNEL_ID_TH18": "WEBHOOK_URL_TH18"
+    "1478369331376160928":
+    "https://discord.com/api/webhooks/1512350198133817476/fRkeFqeM_bLqbGplFj1E6Oy59ewN0EHY0IeGgBKHEkPm3ELcRCp6AxRzpJv8Hwz9LkK9"
 
 };
 
@@ -51,7 +31,7 @@ client.on("ready", () => {
 
 client.on("messageCreate", async (msg) => {
 
-    // Only copy ClashKing bot messages
+    // Only ClashKing bot messages
     if (msg.author.id !== "824653933347209227") return;
 
     const webhook = WEBHOOKS[msg.channel.id];
@@ -60,38 +40,87 @@ client.on("messageCreate", async (msg) => {
 
     try {
 
-        let content = msg.content || "";
+        let content = "";
+        let files = [];
 
-        // Extract embed data
+        // Extract embeds
         if (msg.embeds.length > 0) {
 
             for (const embed of msg.embeds) {
 
+                // Title
                 if (embed.title) {
-                    content += `\n${embed.title}`;
+                    content += `${embed.title}\n`;
                 }
 
+                // Description
                 if (embed.description) {
-                    content += `\n${embed.description}`;
+                    content += `${embed.description}\n`;
                 }
 
+                // URL
                 if (embed.url) {
-                    content += `\n${embed.url}`;
+                    content += `${embed.url}\n`;
                 }
 
+                // Fields
                 if (embed.fields?.length > 0) {
 
                     for (const field of embed.fields) {
 
-                        content += `\n${field.name}: ${field.value}`;
+                        content += `${field.name}: ${field.value}\n`;
 
                     }
 
                 }
 
+                // Main embed image
                 if (embed.image?.url) {
 
-                    content += `\n${embed.image.url}`;
+                    try {
+
+                        const response = await axios.get(
+                            embed.image.url,
+                            {
+                                responseType: "arraybuffer"
+                            }
+                        );
+
+                        files.push({
+                            value: response.data,
+                            options: {
+                                filename: "base.jpg"
+                            }
+                        });
+
+                    } catch (e) {
+                        console.log("Embed image failed");
+                    }
+
+                }
+
+                // Thumbnail support
+                if (embed.thumbnail?.url) {
+
+                    try {
+
+                        const response = await axios.get(
+                            embed.thumbnail.url,
+                            {
+                                responseType: "arraybuffer"
+                            }
+                        );
+
+                        files.push({
+                            value: response.data,
+                            options: {
+                                filename: "thumb.jpg"
+                            }
+                        });
+
+                    } catch (e) {
+                        console.log("Thumbnail failed");
+                    }
 
                 }
 
@@ -108,7 +137,7 @@ client.on("messageCreate", async (msg) => {
 
                     if (component.url) {
 
-                        content += `\n${component.label}: ${component.url}`;
+                        content += `${component.label}: ${component.url}\n`;
 
                     }
 
@@ -118,46 +147,60 @@ client.on("messageCreate", async (msg) => {
 
         }
 
-        const form = new FormData();
-
-        // Prevent empty webhook error
-        if (!content.trim()) {
-            content = "Base Link Below";
-        }
-
-        form.append("content", content);
-
-        // Copy attachments/images
+        // Normal attachments
         if (msg.attachments.size > 0) {
-
-            let index = 0;
 
             for (const attachment of msg.attachments.values()) {
 
-                const response = await axios.get(
-                    attachment.url,
-                    {
-                        responseType: "arraybuffer"
-                    }
-                );
+                try {
 
-                form.append(
-                    `file${index}`,
-                    response.data,
-                    attachment.name
-                );
+                    const response = await axios.get(
+                        attachment.url,
+                        {
+                            responseType: "arraybuffer"
+                        }
+                    );
 
-                index++;
+                    files.push({
+                        value: response.data,
+                        options: {
+                            filename: attachment.name
+                        }
+                    });
+
+                } catch (e) {
+                    console.log("Attachment failed");
+                }
 
             }
 
         }
 
+        // Prevent empty messages
+        if (!content.trim()) {
+            content = "New Base";
+        }
+
+        const form = new FormData();
+
+        form.append("content", content);
+
+        // Add files
+        files.forEach((file, index) => {
+
+            form.append(
+                `file${index}`,
+                file.value,
+                file.options
+            );
+
+        });
+
         await axios.post(webhook, form, {
             headers: form.getHeaders()
         });
 
-        console.log(`Copied ClashKing post from ${msg.channel.name}`);
+        console.log("Copied ClashKing base");
 
     } catch (err) {
 

@@ -1,4 +1,5 @@
 const express = require("express");
+
 const app = express();
 
 app.get("/", (req, res) => {
@@ -15,38 +16,24 @@ const client = new Client();
 
 const TOKEN = process.env.TOKEN;
 
-// SOURCE CHANNEL ID : DESTINATION CHANNEL ID
+// SOURCE CHANNEL : DESTINATION CHANNEL
 const CHANNELS = {
 
-    // TH11
-    "SOURCE_TH11_ID": "DEST_TH11_ID",
-
-    // TH12
-    "SOURCE_TH12_ID": "DEST_TH12_ID",
-
-    // TH13
-    "SOURCE_TH13_ID": "DEST_TH13_ID",
-
     // TH14
-    "1478369331376160928": "1512350167209082981",
+    "1478369331376160928":
+    "1512350167209082981",
 
     // TH15
-    "1478369429380137222": "1512350167209082981",
-
-    // TH16
-    "SOURCE_TH16_ID": "DEST_TH16_ID",
-
-    // TH17
-    "SOURCE_TH17_ID": "DEST_TH17_ID",
-
-    // TH18
-    "SOURCE_TH18_ID": "DEST_TH18_ID"
+    "1478369429380137222":
+    "1512350167209082981"
 
 };
 
 client.on("ready", () => {
 
-    console.log(`Logged in as ${client.user.username}`);
+    console.log(
+        `Logged in as ${client.user.username}`
+    );
 
 });
 
@@ -55,13 +42,9 @@ client.on("messageCreate", async (msg) => {
     try {
 
         // ONLY CLASHKING
-        if (msg.author.id !== "824653933347209227")
-            return;
-
-        // MUST HAVE EMBED / IMAGE
         if (
-            msg.embeds.length === 0 &&
-            msg.attachments.size === 0
+            msg.author.id !==
+            "824653933347209227"
         ) return;
 
         // FIND TARGET CHANNEL
@@ -71,6 +54,7 @@ client.on("messageCreate", async (msg) => {
         if (!targetChannelId)
             return;
 
+        // GET TARGET CHANNEL
         const targetChannel =
             client.channels.cache.get(
                 targetChannelId
@@ -83,7 +67,7 @@ client.on("messageCreate", async (msg) => {
         await msg.forward(targetChannel);
 
         console.log(
-            `Forwarded ClashKing base from ${msg.channel.name}`
+            `Forwarded from ${msg.channel.name}`
         );
 
     } catch (err) {

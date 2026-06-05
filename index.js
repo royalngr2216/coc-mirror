@@ -18,29 +18,11 @@ const TOKEN = process.env.TOKEN;
 // SOURCE CHANNEL : DESTINATION CHANNEL
 const CHANNELS = {
 
-    // TH11
-    "SOURCE_TH11_ID": "DEST_TH11_ID",
-
-    // TH12
-    "SOURCE_TH12_ID": "DEST_TH12_ID",
-
-    // TH13
-    "SOURCE_TH13_ID": "DEST_TH13_ID",
-
     // TH14
     "1478369331376160928": "1512350167209082981",
 
     // TH15
-    "1478369429380137222": "1512350167209082981",
-
-    // TH16
-    "SOURCE_TH16_ID": "DEST_TH16_ID",
-
-    // TH17
-    "SOURCE_TH17_ID": "DEST_TH17_ID",
-
-    // TH18
-    "SOURCE_TH18_ID": "DEST_TH18_ID"
+    "1478369429380137222": "1512350167209082981"
 
 };
 
@@ -62,14 +44,14 @@ client.on("messageCreate", async (msg) => {
             "824653933347209227"
         ) return;
 
-        // CHECK IF SOURCE CHANNEL EXISTS
+        // TARGET CHANNEL
         const targetChannelId =
             CHANNELS[msg.channel.id];
 
         if (!targetChannelId)
             return;
 
-        // GET TARGET CHANNEL
+        // GET CHANNEL
         const targetChannel =
             client.channels.cache.get(
                 targetChannelId
@@ -78,38 +60,11 @@ client.on("messageCreate", async (msg) => {
         if (!targetChannel)
             return;
 
-        // GET EMBEDS
-        const embeds = msg.embeds;
-
-        // GET ATTACHMENTS
-        const files = [];
-
-        msg.attachments.forEach(att => {
-
-            files.push(att.url);
-
-        });
-
-        // SEND CLONED MESSAGE
-        await targetChannel.send({
-
-            content:
-                msg.content || null,
-
-            embeds:
-                embeds.length > 0
-                    ? embeds
-                    : [],
-
-            files:
-                files.length > 0
-                    ? files
-                    : []
-
-        });
+        // FORWARD ORIGINAL MESSAGE
+        await msg.forward(targetChannel);
 
         console.log(
-            `Copied ClashKing message from ${msg.channel.name}`
+            `Forwarded from ${msg.channel.name}`
         );
 
     } catch (err) {
